@@ -82,6 +82,7 @@ class _AddEntryScreenState extends State<AddEntryScreen> {
       appBar: AppBar(
         title: const Text("Add Entry"),
       ),
+      backgroundColor: Colors.deepPurple,
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [

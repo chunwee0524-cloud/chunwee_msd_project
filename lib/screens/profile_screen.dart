@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_analytics/firebase_analytics.dart';
 
 import '../data/bmi_dao.dart';
 import '../models/bmi_log.dart';
@@ -41,16 +42,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _load() async {
     final prefs = await SharedPreferences.getInstance();
+
     _nameCtrl.text = prefs.getString(_kName) ?? '';
     _heightCtrl.text = (prefs.getDouble(_kHeight) ?? 0).toStringAsFixed(0);
     _weightCtrl.text = (prefs.getDouble(_kWeight) ?? 0).toStringAsFixed(1);
 
-    // If saved values were 0, clear display
     if ((prefs.getDouble(_kHeight) ?? 0) == 0) _heightCtrl.text = '';
     if ((prefs.getDouble(_kWeight) ?? 0) == 0) _weightCtrl.text = '';
 
     if (!mounted) return;
-    setState(() => _loading = false);
+
+    setState(() {
+      _loading = false;
+    });
   }
 
   Future<void> _saveProfile() async {
@@ -65,10 +69,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
     await prefs.setDouble(_kWeight, weight ?? 0);
 
     if (!mounted) return;
+
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text("Profile saved ✅")),
     );
-    setState(() {}); // refresh BMI display
+
+    setState(() {});
   }
 
   double? get _heightCm {
@@ -86,6 +92,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   double? get _bmi {
     final h = _heightCm;
     final w = _weightKg;
+
     if (h == null || w == null) return null;
 
     final hm = h / 100.0;
@@ -94,6 +101,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   String get _bmiCategory {
     final bmi = _bmi;
+
     if (bmi == null) return '-';
     if (bmi < 18.5) return 'Underweight';
     if (bmi < 25) return 'Normal';
@@ -114,8 +122,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
 
     final nameNow = _nameCtrl.text.trim();
+
     final log = BmiLog(
-      name: nameNow.isEmpty ? null : nameNow, // ✅ save owner name
+      name: nameNow.isEmpty ? null : nameNow,
       heightCm: h,
       weightKg: w,
       bmi: bmi,
@@ -124,7 +133,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     await _bmiDao.insertLog(log);
 
+    // 🔥 Firebase Analytics event
+    await FirebaseAnalytics.instance.logEvent(
+      name: 'bmi_record_saved',
+      parameters: {
+        'user_name': nameNow.isEmpty ? 'unknown' : nameNow,
+        'height_cm': h.round(),
+        'weight_kg': w,
+        'bmi': double.parse(bmi.toStringAsFixed(1)),
+        'status': _bmiCategory,
+      },
+    );
+
     if (!mounted) return;
+
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text("Saved BMI record ✅")),
     );
@@ -132,11 +154,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) return const Center(child: CircularProgressIndicator());
+    if (_loading) {
+      return const Center(child: CircularProgressIndicator());
+    }
 
     final bmi = _bmi;
-    final nameText =
-    _nameCtrl.text.trim().isEmpty ? "Your Profile" : "${_nameCtrl.text.trim()}'s Profile";
+
+    final nameText = _nameCtrl.text.trim().isEmpty
+        ? "Your Profile"
+        : "${_nameCtrl.text.trim()}'s Profile";
 
     return Scaffold(
       body: ListView(
@@ -150,8 +176,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 children: [
                   Text(
                     nameText,
-                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
+
                   const SizedBox(height: 12),
 
                   TextField(
@@ -162,6 +192,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                     onChanged: (_) => setState(() {}),
                   ),
+
                   const SizedBox(height: 12),
 
                   Row(
@@ -177,7 +208,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           onChanged: (_) => setState(() {}),
                         ),
                       ),
+
                       const SizedBox(width: 12),
+
                       Expanded(
                         child: TextField(
                           controller: _weightCtrl,
@@ -191,6 +224,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                     ],
                   ),
+
                   const SizedBox(height: 14),
 
                   FilledButton.icon(
@@ -213,7 +247,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     onPressed: () {
                       Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (_) => const BmiHistoryScreen()),
+                        MaterialPageRoute(
+                          builder: (_) => const BmiHistoryScreen(),
+                        ),
                       );
                     },
                     icon: const Icon(Icons.history),
@@ -235,20 +271,33 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text("BMI", style: TextStyle(fontWeight: FontWeight.w800)),
+                        const Text(
+                          "BMI",
+                          style: TextStyle(fontWeight: FontWeight.w800),
+                        ),
+
                         const SizedBox(height: 6),
+
                         Text(
                           bmi == null ? "-" : bmi.toStringAsFixed(1),
-                          style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w900),
+                          style: const TextStyle(
+                            fontSize: 28,
+                            fontWeight: FontWeight.w900,
+                          ),
                         ),
+
                         const SizedBox(height: 4),
+
                         Text(
                           _bmiCategory,
-                          style: TextStyle(color: Colors.black.withOpacity(0.65)),
+                          style: TextStyle(
+                            color: Colors.black.withOpacity(0.65),
+                          ),
                         ),
                       ],
                     ),
                   ),
+
                   const Icon(Icons.monitor_weight, size: 34),
                 ],
               ),

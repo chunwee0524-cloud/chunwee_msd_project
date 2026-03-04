@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_analytics/firebase_analytics.dart';
 
 class WaterScreen extends StatefulWidget {
   const WaterScreen({super.key});
@@ -38,6 +39,15 @@ class _WaterScreenState extends State<WaterScreen> {
   }
 
   Future<void> _add(int ml) async {
+    await FirebaseAnalytics.instance.logEvent(
+      name: "water_added",
+      parameters: {
+        "amount_ml": ml,
+        "current_intake": _intake + ml,
+        "goal_ml": _goal,
+      },
+    );
+
     setState(() => _intake += ml);
     await _save();
   }

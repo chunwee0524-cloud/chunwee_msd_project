@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_analytics/firebase_analytics.dart';
 
 import '../models/food_item.dart';
 import '../data/calories_dao.dart';
@@ -91,6 +92,15 @@ class _FoodScreenState extends State<FoodScreen> {
   }
 
   Future<void> _addToToday(FoodItem item) async {
+    await FirebaseAnalytics.instance.logEvent(
+      name: "food_added",
+      parameters: {
+        "food_name": item.name,
+        "calories": item.calories,
+        "category": item.category,
+      },
+    );
+
     setState(() {
       _todayTotal += item.calories;
       _todayItems.add(item.name);

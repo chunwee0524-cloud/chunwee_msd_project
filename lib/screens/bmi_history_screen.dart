@@ -123,6 +123,7 @@ class _BmiHistoryScreenState extends State<BmiHistoryScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.cyan,
       appBar: AppBar(
         title: const Text("BMI History"),
         actions: [

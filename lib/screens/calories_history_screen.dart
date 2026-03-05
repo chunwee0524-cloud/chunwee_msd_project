@@ -72,6 +72,7 @@ class _CaloriesHistoryScreenState extends State<CaloriesHistoryScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.cyan[100],
       appBar: AppBar(
         title: const Text("Calories History"),
         actions: [

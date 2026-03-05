@@ -10,12 +10,18 @@ class WaterScreen extends StatefulWidget {
 }
 
 class _WaterScreenState extends State<WaterScreen> {
-  static const _kIntakeKey = 'water_intake_ml';
-  static const _kGoalKey = 'water_goal_ml';
+  // Base keys (we will scope them by user)
+  static const _kIntakeBase = 'water_intake_ml';
+  static const _kGoalBase = 'water_goal_ml';
+  static const _kCurrentUser = 'current_user';
 
   int _intake = 0;
   int _goal = 2000;
   bool _loading = true;
+
+  String _uid = 'default';
+
+  String _k(String base) => '${base}__$_uid';
 
   @override
   void initState() {
@@ -25,17 +31,39 @@ class _WaterScreenState extends State<WaterScreen> {
 
   Future<void> _load() async {
     final prefs = await SharedPreferences.getInstance();
+    final uid = prefs.getString(_kCurrentUser) ?? 'default';
+
+    // Migration fallback (if old global keys exist)
+    final scopedIntake = prefs.getInt('${_kIntakeBase}__$uid');
+    final scopedGoal = prefs.getInt('${_kGoalBase}__$uid');
+
+    final oldIntake = prefs.getInt(_kIntakeBase);
+    final oldGoal = prefs.getInt(_kGoalBase);
+
+    final intake = scopedIntake ?? oldIntake ?? 0;
+    final goal = scopedGoal ?? oldGoal ?? 2000;
+
+    // If we loaded from old keys, write into new scoped keys once
+    if (scopedIntake == null && oldIntake != null) {
+      await prefs.setInt('${_kIntakeBase}__$uid', oldIntake);
+    }
+    if (scopedGoal == null && oldGoal != null) {
+      await prefs.setInt('${_kGoalBase}__$uid', oldGoal);
+    }
+
+    if (!mounted) return;
     setState(() {
-      _intake = prefs.getInt(_kIntakeKey) ?? 0;
-      _goal = prefs.getInt(_kGoalKey) ?? 2000;
+      _uid = uid;
+      _intake = intake;
+      _goal = goal;
       _loading = false;
     });
   }
 
   Future<void> _save() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt(_kIntakeKey, _intake);
-    await prefs.setInt(_kGoalKey, _goal);
+    await prefs.setInt(_k(_kIntakeBase), _intake);
+    await prefs.setInt(_k(_kGoalBase), _goal);
   }
 
   Future<void> _add(int ml) async {
@@ -45,6 +73,7 @@ class _WaterScreenState extends State<WaterScreen> {
         "amount_ml": ml,
         "current_intake": _intake + ml,
         "goal_ml": _goal,
+        "user": _uid,
       },
     );
 
@@ -58,40 +87,60 @@ class _WaterScreenState extends State<WaterScreen> {
   }
 
   Future<void> _setGoalDialog() async {
-    final controller = TextEditingController(text: _goal.toString());
+    String value = _goal.toString();
+
     final result = await showDialog<int>(
       context: context,
-      builder: (_) => AlertDialog(
-        title: const Text("Set daily goal (ml)"),
-        content: TextField(
-          controller: controller,
-          keyboardType: TextInputType.number,
-          decoration: const InputDecoration(hintText: "e.g. 2000"),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
-          FilledButton(
-            onPressed: () {
-              final v = int.tryParse(controller.text.trim());
-              Navigator.pop(context, v);
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text("Set daily goal (ml)"),
+          content: TextField(
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(
+              hintText: "e.g. 2000",
+            ),
+            onChanged: (v) {
+              value = v;
             },
-            child: const Text("Save"),
           ),
-        ],
-      ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(dialogContext);
+              },
+              child: const Text("Cancel"),
+            ),
+            FilledButton(
+              onPressed: () {
+                final v = int.tryParse(value.trim());
+                Navigator.pop(dialogContext, v);
+              },
+              child: const Text("Save"),
+            ),
+          ],
+        );
+      },
     );
 
     if (result != null && result >= 500 && result <= 6000) {
-      setState(() => _goal = result);
+      setState(() {
+        _goal = result;
+      });
+
       await _save();
+
       if (!mounted) return;
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("Goal set to $_goal ml")),
       );
     } else if (result != null) {
       if (!mounted) return;
+
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Please enter a goal between 500 and 6000 ml")),
+        const SnackBar(
+          content: Text("Please enter a goal between 500 and 6000 ml"),
+        ),
       );
     }
   }
@@ -105,6 +154,7 @@ class _WaterScreenState extends State<WaterScreen> {
     final progress = (_goal == 0) ? 0.0 : (_intake / _goal).clamp(0.0, 1.0);
 
     return Scaffold(
+      backgroundColor: Colors.cyan[100],
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -184,9 +234,7 @@ class _WaterScreenState extends State<WaterScreen> {
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.w600,
-                  color: progress >= 1.0
-                      ? Colors.green
-                      : Colors.black.withOpacity(0.6),
+                  color: progress >= 1.0 ? Colors.green : Colors.black.withOpacity(0.6),
                 ),
               ),
             ),

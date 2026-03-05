@@ -14,12 +14,16 @@ class FoodScreen extends StatefulWidget {
 }
 
 class _FoodScreenState extends State<FoodScreen> {
+  static const _kCurrentUser = 'current_user';
+
   final _searchCtrl = TextEditingController();
   String _selectedCategory = 'All';
 
   // ✅ Today data
   int _todayTotal = 0;
   List<String> _todayItems = [];
+
+  String _uid = 'default';
 
   final _calDao = CaloriesDao();
 
@@ -39,7 +43,17 @@ class _FoodScreenState extends State<FoodScreen> {
   @override
   void initState() {
     super.initState();
-    _loadToday();
+    _initUserAndLoadToday();
+  }
+
+  Future<void> _initUserAndLoadToday() async {
+    final prefs = await SharedPreferences.getInstance();
+    final uid = prefs.getString(_kCurrentUser) ?? 'default';
+
+    if (!mounted) return;
+    setState(() => _uid = uid);
+
+    await _loadToday();
   }
 
   @override
@@ -54,18 +68,39 @@ class _FoodScreenState extends State<FoodScreen> {
     return "${now.year}-${two(now.month)}-${two(now.day)}";
   }
 
-  String get _todayKey => "cal_today_${_todayDayKey()}";
+  // ✅ user-scoped today keys
+  String get _todayKey => "cal_today__${_uid}__${_todayDayKey()}";
   String get _itemsKey => "${_todayKey}_items";
+
+  // old (global) keys for migration
+  String get _oldTodayKey => "cal_today_${_todayDayKey()}";
+  String get _oldItemsKey => "${_oldTodayKey}_items";
 
   Future<void> _loadToday() async {
     final prefs = await SharedPreferences.getInstance();
-    final total = prefs.getInt(_todayKey) ?? 0;
-    final list = prefs.getStringList(_itemsKey) ?? [];
+
+    final scopedTotal = prefs.getInt(_todayKey);
+    final scopedList = prefs.getStringList(_itemsKey);
+
+    // fallback to old global keys if scoped does not exist yet
+    final oldTotal = prefs.getInt(_oldTodayKey);
+    final oldList = prefs.getStringList(_oldItemsKey);
+
+    final total = scopedTotal ?? oldTotal ?? 0;
+    final list = scopedList ?? oldList ?? <String>[];
+
+    // migrate once
+    if (scopedTotal == null && oldTotal != null) {
+      await prefs.setInt(_todayKey, oldTotal);
+    }
+    if (scopedList == null && oldList != null) {
+      await prefs.setStringList(_itemsKey, oldList);
+    }
 
     if (!mounted) return;
     setState(() {
       _todayTotal = total;
-      _todayItems = list;
+      _todayItems = List<String>.from(list);
     });
   }
 
@@ -98,6 +133,7 @@ class _FoodScreenState extends State<FoodScreen> {
         "food_name": item.name,
         "calories": item.calories,
         "category": item.category,
+        "user": _uid,
       },
     );
 
@@ -172,7 +208,6 @@ class _FoodScreenState extends State<FoodScreen> {
 
     final day = _todayDayKey();
 
-    // ✅ confirmation dialog
     final ok = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
@@ -187,6 +222,7 @@ class _FoodScreenState extends State<FoodScreen> {
 
     if (ok != true) return;
 
+    // CaloriesDao should already be per-user if you updated it earlier.
     await _calDao.upsertDay(day, _todayTotal);
 
     if (!mounted) return;
@@ -200,10 +236,10 @@ class _FoodScreenState extends State<FoodScreen> {
     final list = _filtered;
 
     return Scaffold(
+      backgroundColor: Colors.cyan[100],
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          // ✅ TODAY CARD
           Card(
             child: Padding(
               padding: const EdgeInsets.all(14),
@@ -275,7 +311,6 @@ class _FoodScreenState extends State<FoodScreen> {
 
           const SizedBox(height: 16),
 
-          // ✅ Search
           TextField(
             controller: _searchCtrl,
             decoration: InputDecoration(
@@ -295,7 +330,6 @@ class _FoodScreenState extends State<FoodScreen> {
           ),
           const SizedBox(height: 12),
 
-          // ✅ Categories
           SizedBox(
             height: 40,
             child: ListView.separated(
@@ -316,7 +350,6 @@ class _FoodScreenState extends State<FoodScreen> {
 
           const SizedBox(height: 14),
 
-          // ✅ Food list
           if (list.isEmpty)
             const Padding(
               padding: EdgeInsets.only(top: 40),

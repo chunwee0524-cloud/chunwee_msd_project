@@ -22,6 +22,6 @@ class DiaryEntry {
     id: map['id'] as int?,
     imagePath: map['imagePath'] as String,
     comment: map['comment'] as String?,
-    createdAt: map['createdAt'] as int,
+    createdAt: (map['createdAt'] as num).toInt(),
   );
 }

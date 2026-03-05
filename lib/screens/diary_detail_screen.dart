@@ -18,6 +18,7 @@ class DiaryDetailScreen extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
 
     return Scaffold(
+      backgroundColor: Colors.cyan[100],
       appBar: AppBar(title: const Text("Entry")),
       body: ListView(
         padding: const EdgeInsets.all(16),

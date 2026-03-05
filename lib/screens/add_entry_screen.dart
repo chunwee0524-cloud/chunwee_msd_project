@@ -79,6 +79,7 @@ class _AddEntryScreenState extends State<AddEntryScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.cyan[100],
       appBar: AppBar(
         title: const Text("Add Entry"),
       ),

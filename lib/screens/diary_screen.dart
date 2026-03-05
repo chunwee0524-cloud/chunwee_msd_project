@@ -76,6 +76,7 @@ class _DiaryScreenState extends State<DiaryScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.cyan[100],
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _entries.isEmpty
